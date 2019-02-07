@@ -1,4 +1,4 @@
-package com.vanroon
+package org.vanroon
 
 class Math {
 

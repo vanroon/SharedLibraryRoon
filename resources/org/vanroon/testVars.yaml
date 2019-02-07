@@ -1,0 +1,15 @@
+PERSON1:
+  name:                'Testy McTestface'
+  age:                 '32'
+  dob:                 '1990-01-01'
+  ssn:                 '123456789'
+  extra_notes:
+    - "This is note1"
+    - "Note 2 with \"quotes\""
+  job_params:
+    title:              'Testperson'
+    stationed_in:       'The Netherlands'
+    company:            'DummyPersons Ltd.'
+  House_params:
+    City:               'Villagecity'
+    Adress:             '123 Streetlane'
