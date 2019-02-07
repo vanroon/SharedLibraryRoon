@@ -19,7 +19,11 @@ class Person implements Serializable {
         if(yaml){
             infos.putAll(yaml)
         }
-        infos.each {k, v -> steps.echo k, v}
+        for (i in infos){
+            def name = i.key
+            steps.echo name
+
+        }
     }
 
     def sayName(){
