@@ -19,7 +19,7 @@ class Person implements Serializable {
         if(yaml){
             infos.putAll(yaml)
         }
-        infos.getClass()
+        steps.echo infos.getClass()
     }
 
     def sayName(){
