@@ -7,7 +7,7 @@ class Person implements Serializable {
     public def name
 
 //    PipelineBuilder(steps){
-//        this.steps = steps
+//        this.steps = steps //d
 //    }
     Person(steps, name){
         this.steps = steps
