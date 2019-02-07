@@ -22,8 +22,9 @@ class Person implements Serializable {
         for (i in infos){
             def name = i.key
             steps.echo name
-            for (j in name){
-                steps.echo j.key
+            for (j in infos[name]){
+                def name2 = j.key
+                steps.echo name2
             }
 
         }
