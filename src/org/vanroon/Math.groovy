@@ -2,7 +2,7 @@ package org.vanroon
 
 class Math {
 
-	def multiply(a, b){
+	def multiply(int a, int b){
 		def c = a*b
 		return c
 	}
