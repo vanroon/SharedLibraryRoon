@@ -22,7 +22,7 @@ class Person implements Serializable {
     }
 
     def sayName(){
-        print "Hi, my name is: " + this.name
+        print "Hi, my name is: "
     }
 
 }
