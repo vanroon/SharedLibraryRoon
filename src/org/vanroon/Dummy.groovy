@@ -45,7 +45,7 @@ class Dummy extends PipelineBuilder {
     }
 
     def getUser() {
-        userId = findUser()
+        def userId = findUser()
         jEcho userId
     }
 
