@@ -35,6 +35,7 @@ class Person implements Serializable {
 //            def env = envs[envName]
 //            def environment = env['parameters']['environment']
             def city = person['House_params']['City']
+            steps.echo city
         }
 
     }
