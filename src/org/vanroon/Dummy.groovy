@@ -1,7 +1,7 @@
 package org.vanroon
 
 class Dummy extends PipelineBuilder {
-    private Map<String,Object> infos = new HashMap<>()
+//    private Map<String,Object> infos = new HashMap<>()
 
 //    protected def steps
     public def name
@@ -10,7 +10,7 @@ class Dummy extends PipelineBuilder {
 //        this.steps = steps //
 //    }
     Dummy(steps, name){
-        this.steps = steps
+        super(steps)
         this.name = name
     }
 
