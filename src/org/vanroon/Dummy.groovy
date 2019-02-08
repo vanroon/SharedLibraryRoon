@@ -9,8 +9,8 @@ class Dummy extends PipelineBuilder {
 //    PipelineBuilder(steps){
 //        this.steps = steps //
 //    }
-    Dummy(steps, currentBuild, name){
-        super(steps, currentBuild)
+    Dummy(steps, name){
+        super(steps)
         this.name = name
     }
 
