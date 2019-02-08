@@ -1,6 +1,5 @@
 PERSON1:
   name:                'Testy McTestface'
-  age:                 '32'
   dob:                 '1990-01-01'
   ssn:                 '123456789'
   extra_notes:
@@ -13,3 +12,18 @@ PERSON1:
   House_params:
     City:               'Villagecity'
     Adress:             '123 Streetlane'
+PERSON2:
+  name:                'John Doe'
+  age:                 '23'
+  dob:                 '1980-12-12'
+  ssn:                 '987654312'
+  extra_notes:
+    - "This is note1"
+    - "Note 2 with \"quotes\""
+  job_params:
+    title:              'Ensayador dos'
+    stationed_in:       'Mexico'
+    company:            'Agave Harvest Co.'
+  House_params:
+    City:               'Mexico-city'
+    Adress:             'Calle Adolfo Prieto s/n Local 237'

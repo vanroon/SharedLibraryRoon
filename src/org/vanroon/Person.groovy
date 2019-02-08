@@ -28,6 +28,15 @@ class Person implements Serializable {
             }
 
         }
+        steps.echo "now printing the  vars"
+        steps.echo "infos"
+        for ( i in infos ){
+            def person = infos[i]
+//            def env = envs[envName]
+//            def environment = env['parameters']['environment']
+            def city = person['House_params']['City']
+        }
+
     }
 
     def sayName(){
