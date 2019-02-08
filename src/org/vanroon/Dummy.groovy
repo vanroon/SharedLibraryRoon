@@ -41,7 +41,7 @@ class Dummy extends PipelineBuilder {
     }
 
     def sayName(){
-        steps.echo "Hi, my name is: " + name
+        jEcho "Hi, my name is: " + name
     }
 
     def getUser() {
