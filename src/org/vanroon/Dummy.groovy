@@ -1,15 +1,15 @@
 package org.vanroon
 
-class Person implements Serializable {
+class Dummy extends PipelineBuilder {
     private Map<String,Object> infos = new HashMap<>()
 
-    protected def steps
+//    protected def steps
     public def name
 
 //    PipelineBuilder(steps){
 //        this.steps = steps //
 //    }
-    Person(steps, name){
+    Dummy(steps, name){
         this.steps = steps
         this.name = name
     }
@@ -34,7 +34,7 @@ class Person implements Serializable {
             def person = infos[i]
 //            def env = envs[envName]
 //            def environment = env['parameters']['environment']
-            def city = person['House_params']['City']
+//            def city = person['House_params']['City']
             steps.echo city
         }
 
@@ -43,5 +43,8 @@ class Person implements Serializable {
     def sayName(){
         steps.echo "Hi, my name is: " + name
     }
+
+    userId = findUser()
+    echo userId
 
 }
