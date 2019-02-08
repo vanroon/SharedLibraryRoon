@@ -3,9 +3,11 @@ package org.vanroon;
 class PipelineBuilder implements Serializable {
     protected def steps
 
-    PipelineBuilder(steps){
+    PipelineBuilder(steps, currentBuild){
         assert steps != null
+        assert currentBuild != null
         this.steps = steps
+        this.currentBuild = currentBuild
     }
 
     /**
