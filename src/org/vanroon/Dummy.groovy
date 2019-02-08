@@ -44,7 +44,9 @@ class Dummy extends PipelineBuilder {
         steps.echo "Hi, my name is: " + name
     }
 
-    userId = findUser()
-    echo userId
+    def getUser() {
+        userId = findUser()
+        jEcho userId
+    }
 
 }
