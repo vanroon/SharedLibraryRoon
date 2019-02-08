@@ -22,4 +22,9 @@ class PipelineBuilder implements Serializable {
         return steps.env.BUILD_USER_ID
     }
 
+    @NonCPS
+    def getBuildUser() {
+        return currentBuild.rawBuild.getCause(Cause.UserIdCause).getUserId()
+    }
+
 }
