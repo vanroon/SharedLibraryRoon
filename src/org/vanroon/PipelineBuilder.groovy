@@ -1,4 +1,4 @@
-package org.vanroon
+package org.vanroon;
 
 class PipelineBuilder implements Serializable {
     protected def steps
