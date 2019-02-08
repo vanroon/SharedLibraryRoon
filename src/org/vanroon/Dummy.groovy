@@ -49,7 +49,7 @@ class Dummy extends PipelineBuilder {
 //        jEcho userId
 //    }
 
-    def getUser() {
+    def getBuildUser() {
         def userId = getBuildUser()
         echo userId
     }
