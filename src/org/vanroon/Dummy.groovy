@@ -1,4 +1,4 @@
-package org.vanroon;
+package org.vanroon
 
 class Dummy extends PipelineBuilder {
     private Map<String,Object> infos = new HashMap<>()
