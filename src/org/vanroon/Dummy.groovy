@@ -32,10 +32,6 @@ class Dummy extends PipelineBuilder {
         steps.echo "infos"
         for ( i in infos ){
             def person = infos[i]
-//            def env = envs[envName]
-//            def environment = env['parameters']['environment']
-//            def city = person['House_params']['City']
-            steps.echo city
         }
 
     }
@@ -43,11 +39,6 @@ class Dummy extends PipelineBuilder {
     def sayName(){
         jEcho "Hi, my name is: " + name
     }
-
-//    def getUser() {
-//        def userId = findUser()
-//        jEcho userId
-//    }
 
     def getUser() {
         return getBuildUser()

@@ -25,6 +25,11 @@ class PipelineBuilder implements Serializable {
     def getCurrentBuild() {
 
     }
+
+    /**
+     * Return userId of user who started the buid in Jenkins
+     * @return
+     */
     @NonCPS
     def getBuildUser() {
         return steps.currentBuild.rawBuild.getCause(Cause.UserIdCause).getUserId()
