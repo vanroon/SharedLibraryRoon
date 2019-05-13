@@ -1,0 +1,21 @@
+@Library('SharedLibraryRoon') _
+
+pipeline{
+    agent any
+    stages{
+
+        stage('Demo') {
+            steps{
+                script{
+                    echo 'Hello World'
+        
+                    sayHello 'Dave'                     
+                    sayAlert 'ERROR ERRROR'
+                    a = new org.vanroon.Math()
+                    println a.multiply(2,3)
+                    
+                }
+            }
+        }
+    }
+}
