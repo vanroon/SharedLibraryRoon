@@ -1,5 +1,8 @@
-package org.vanroon
+package org.vanroon;
 
+import groovy.transform.InheritConstructors
+
+@InheritConstructors
 class Dummy extends PipelineBuilder {
 //    private Map<String,Object> infos = new HashMap<>()
 
@@ -37,7 +40,7 @@ class Dummy extends PipelineBuilder {
     }
 
     def sayName(){
-        jEcho "Hi, my name is: " + name
+        return name
     }
 
     def getUser() {

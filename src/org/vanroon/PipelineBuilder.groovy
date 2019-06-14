@@ -35,4 +35,14 @@ class PipelineBuilder implements Serializable {
         return steps.currentBuild.rawBuild.getCause(Cause.UserIdCause).getUserId()
     }
 
+    def httpRequest(String url) {
+        // return url
+        def get = new URL(url).openConnection()
+        def getRC = get.getResponseCode()
+        //return getRC
+        //println(getRC);
+        if(getRC.equals(200)) {
+            return get.getInputStream().getText()
+        }
+    }
 }
