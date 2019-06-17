@@ -45,6 +45,15 @@ class Jenkins extends PipelineBuilder {
 
     }
 
+    def addPipelineJob(String userColonPass="", String jobName){
+        // first get file
+        new File("config.xml") << new URL("https://raw.githubusercontent.com/vanroon/misc/master/jenkins/actions/config-default.xml").getText()
+        sh("ls -als && pwd")
+        // second replace values
+
+        // thirt exec post command
+    }
+
     // def getOldWay(){
     //     steps.withCredentials (
     //         [steps.usernameColonPassword(credentialsId: credentials, variable: 'USERPASS')]
