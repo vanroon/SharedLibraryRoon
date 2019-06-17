@@ -71,8 +71,10 @@ class PipelineBuilder implements Serializable {
         // }
     }
 
-    def postHttpRequest(String url) {
-        
+    // def postHttpRequest(String url) {
+    //     def conn = new URL(url).openConnection() as HttpURLConnection
+    //     conn.setRequestMethod("POST")
+    //     return conn
 
-    }
+    // }
 }

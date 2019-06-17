@@ -45,18 +45,23 @@ class Jenkins extends PipelineBuilder {
 
     }
 
-    def addPipelineJob(String userColonPass="", String jobName){
-        steps.writeFile file: "config.xml", text: "oioioi"
-        def fc = new File('config.xml').text
-        jEcho fc
+
+// FINIS THIS..
+    def addPipelineJob(String userColonPass="", String jobName, ){
+        // first get file
+        pipelineConfig = new URL('http://10.212.0.109:8082/dwg-overhead/dwg-automation/raw/master/apiCalls/jenkins/addPipelineJob/pipelineConfig.xml').getText()
+        // second replace values
+        pipelineConfig = pipelineConfig.replaceAll("@@gitlabconnection@@", "${GITLAB_CONN}")
+        pipelineConfig = pipelineConfig.replaceAll("@@secrettoken@@", "${SECRET_TOKEN}")
+        pipelineConfig = pipelineConfig.replaceAll("@@gitrepo@@", "${GIT_REPO}")
+        pipelineConfig = pipelineConfig.replaceAll("@@credentialsid@@", "${CREDENTIALS_ID}")
+        pipelineConfig = pipelineConfig.replaceAll("@@scriptPath@@", "${SCRIPT_PATH}")
         
         // theDir = new File(steps.envVars.get('WORKSPACE'))
         // println theDir.exists()
-        // first get file
         // def config = new File('config.xml')
         // config.write "this is some content" //<< new URL("https://raw.githubusercontent.com/vanroon/misc/master/jenkins/actions/config-default.xml").getText()
          sh("ls -als && pwd && cat config.xml")
-        // second replace values
 
         // thirt exec post command
     }
