@@ -1,5 +1,7 @@
 package org.vanroon;
 
+import groovy.json.JsonSlurper
+
 class PipelineBuilder implements Serializable {
     protected def steps
 
@@ -26,6 +28,10 @@ class PipelineBuilder implements Serializable {
 
     }
 
+    def sh(command){
+        steps.sh command
+    }
+
     /**
      * Return userId of user who started the buid in Jenkins
      * @return
@@ -39,15 +45,21 @@ class PipelineBuilder implements Serializable {
         return string.bytes.encodeBase64().toString()
     }
 
-    def getHttpRequest(String url, String credentials="") {
-        // return url
+    def getHttpRequestJson(String url, String credentials="") {
         def conn = new URL(url).openConnection() as HttpURLConnection
         if (credentials.length() > 0){
             def auth = encodeBase64(credentials)
             conn.setRequestProperty("Authorization", "Basic ${auth}")
         }
         if (conn.responseCode == 200){
-            return conn.getInputStream().getText()
+            // def json = conn.inputStream.withCloseable { inStream ->
+            //     new JsonSlurper().parse( inStream as InputStream )
+            // }
+            // return json
+           def resultText = conn.getInputStream().getText()
+           //def result = steps.readJSON text: resultText
+           return resultText
+          /// return result['crumb']
         }
        
         // def getRC = get.getResponseCode()
