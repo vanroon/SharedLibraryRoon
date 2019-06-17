@@ -32,14 +32,16 @@ class Jenkins extends PipelineBuilder {
     def deleteJob(String userColonPass="", String jobName){
         def jenkinsCrumb = getCrumb(userColonPass)
         jEcho jenkinsCrumb
-        def conn = new URL(url + "/job/${jobName}/doDelete").openConnection() as HttpURLConnection
+        def delUrl = url + "/job/${jobName}/doDelete"
+        jEcho delUrl
+        def conn = new URL(delUrl).openConnection() as HttpURLConnection
         conn.setRequestMethod("POST")
         if (userColonPass.length() > 0){
             def auth = encodeBase64(userColonPass)
             conn.setRequestProperty("Authorization", "Basic ${auth}")
         }
        conn.setRequestProperty("Jenkins-Crumb", jenkinsCrumb)
-       jEcho conn.getInputStream().getText()
+       jEcho conn.getResponseCode().toString()
 
     }
 
