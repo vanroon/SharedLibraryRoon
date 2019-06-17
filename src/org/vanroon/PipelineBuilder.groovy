@@ -35,14 +35,31 @@ class PipelineBuilder implements Serializable {
         return steps.currentBuild.rawBuild.getCause(Cause.UserIdCause).getUserId()
     }
 
-    def httpRequest(String url) {
+    def encodeBase64(String string){
+        return string.bytes.encodeBase64().toString()
+    }
+
+    def getHttpRequest(String url, String credentials="") {
         // return url
-        def get = new URL(url).openConnection()
-        def getRC = get.getResponseCode()
-        //return getRC
-        //println(getRC);
-        if(getRC.equals(200)) {
-            return get.getInputStream().getText()
+        def conn = new URL(url).openConnection() as HttpURLConnection
+        if (credentials.length() > 0){
+            def auth = encodeBase64(credentials)
+            conn.setRequestProperty("Authorization", "Basic ${auth}")
         }
+        if (conn.responseCode == 200){
+            return conn.getInputStream().getText()
+        }
+       
+        // def getRC = get.getResponseCode()
+        // //return getRC
+        // //println(getRC);
+        // if(getRC.equals(200)) {
+        //     return get.getInputStream().getText()
+        // }
+    }
+
+    def postHttpRequest(String url) {
+        
+
     }
 }
