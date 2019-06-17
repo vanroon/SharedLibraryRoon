@@ -47,6 +47,8 @@ class Jenkins extends PipelineBuilder {
 
     def addPipelineJob(String userColonPass="", String jobName){
         steps.writeFile file: "config.xml", text: "oioioi"
+        def fc = new File('config.xml').text
+        jEcho fc
         
         // theDir = new File(steps.envVars.get('WORKSPACE'))
         // println theDir.exists()
