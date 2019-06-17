@@ -38,8 +38,8 @@ class Jenkins extends PipelineBuilder {
             def auth = encodeBase64(userColonPass)
             conn.setRequestProperty("Authorization", "Basic ${auth}")
         }
-       conn.setRequestProperty("Jenkins-Crumb", getCrumb(userColonPass))
-       //jEcho conn.responseCode
+       conn.setRequestProperty("Jenkins-Crumb", jenkinsCrumb)
+       jEcho conn.responseCode
 
     }
 
