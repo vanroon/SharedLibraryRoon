@@ -47,8 +47,9 @@ class Jenkins extends PipelineBuilder {
 
     def addPipelineJob(String userColonPass="", String jobName){
         // first get file
-        new File("config.xml") << new URL("https://raw.githubusercontent.com/vanroon/misc/master/jenkins/actions/config-default.xml").getText()
-        sh("ls -als && pwd")
+        def config = new File('config.xml')
+        config.write "this is some content" //<< new URL("https://raw.githubusercontent.com/vanroon/misc/master/jenkins/actions/config-default.xml").getText()
+        sh("ls -als && pwd && cat config.xml")
         // second replace values
 
         // thirt exec post command
