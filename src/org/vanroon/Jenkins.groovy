@@ -31,6 +31,7 @@ class Jenkins extends PipelineBuilder {
 
     def deleteJob(String userColonPass="", String jobName){
         def jenkinsCrumb = getCrumb(userColonPass)
+        jEcho jenkinsCrumb
         def conn = new URL(url + "/job/${jobName}/doDelete").openConnection() as HttpURLConnection
         conn.setRequestMethod("POST")
         if (userColonPass.length() > 0){
