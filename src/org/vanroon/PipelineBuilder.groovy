@@ -47,6 +47,7 @@ class PipelineBuilder implements Serializable {
 
     def getHttpRequestJson(String url, String credentials="") {
         def conn = new URL(url).openConnection() as HttpURLConnection
+        conn.setRequestMethod("GET")
         if (credentials.length() > 0){
             def auth = encodeBase64(credentials)
             conn.setRequestProperty("Authorization", "Basic ${auth}")
