@@ -29,6 +29,18 @@ class Jenkins extends PipelineBuilder {
         //}
     }
 
+    def deleteJob(String userColonPass="", String jobName){
+        def jenkinsCrumb = getCrumb(userColonPass)
+        def conn = postHttpRequest(url + "/job/${jobName}/doDelete")
+        if (userColonPass.length() > 0){
+            def auth = encodeBase64(userColonPass)
+            conn.setRequestProperty("Authorization", "Basic ${auth}")
+        }
+       conn.setRequestProperty("Jenkins-Crumb", getCrumb(userColonPass))
+       return conn.responseCode
+
+    }
+
     // def getOldWay(){
     //     steps.withCredentials (
     //         [steps.usernameColonPassword(credentialsId: credentials, variable: 'USERPASS')]
