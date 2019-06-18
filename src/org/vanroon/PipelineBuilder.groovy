@@ -46,6 +46,7 @@ class PipelineBuilder implements Serializable {
     }
 
     def getHttpRequestJson(String url, String credentials="") {
+        jEcho "URL = ${url}"
         def conn = new URL(url).openConnection() as HttpURLConnection
         conn.setRequestMethod("GET")
         if (credentials.length() > 0){
@@ -53,28 +54,31 @@ class PipelineBuilder implements Serializable {
             conn.setRequestProperty("Authorization", "Basic ${auth}")
         }
         if (conn.responseCode == 200){
-            // def json = conn.inputStream.withCloseable { inStream ->
-            //     new JsonSlurper().parse( inStream as InputStream )
-            // }
-            // return json
            def resultText = conn.getInputStream().getText()
-           //def result = steps.readJSON text: resultText
            return resultText
-          /// return result['crumb']
         }
-       
-        // def getRC = get.getResponseCode()
-        // //return getRC
-        // //println(getRC);
-        // if(getRC.equals(200)) {
-        //     return get.getInputStream().getText()
-        // }
     }
 
-    // def postHttpRequest(String url) {
-    //     def conn = new URL(url).openConnection() as HttpURLConnection
-    //     conn.setRequestMethod("POST")
-    //     return conn
-
-    // }
+    def postHttpRequestWithXMLBody(String url, String jenkinsCrumb="", String auth="", String body="") {
+        jEcho "URL = ${url}"
+        def conn = new URL(url).openConnection() as HttpURLConnection
+        conn.setRequestMethod("POST")   
+        if (jenkinsCrumb.length() > 0){
+            jEcho "Parsing crumb: ${jenkinsCrumb}"
+            conn.setRequestProperty("Jenkins-Crumb", jenkinsCrumb)
+        }
+        if (auth.length() > 0){
+            jEcho "parsing auth: ${auth}"
+            conn.setRequestProperty("Authorization", "Basic ${auth}")
+        }
+        if (body.length() > 0){
+            conn.setRequestProperty("Content-Type", "text/xml")
+            jEcho "parsing body: ${body}"
+            conn.setDoOutput(true)
+            def OutputStream output = conn.getOutputStream()
+            byte[] input = body.getBytes('utf-8')
+            output.write(input, 0, input.length)
+        }
+        return conn.responseCode
+    }
 }
