@@ -1,3 +1,7 @@
 *.swp
 *.swq
 *.idea
+*.gradle
+gradle/
+gradlew*
+build/

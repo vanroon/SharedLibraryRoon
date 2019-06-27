@@ -2,7 +2,5 @@
 // vars/sayAlert.groovy
 
 def call(String msg){
-	echo "==== ALERT ===="
-	echo "${msg}"
-	echo "==== END OF ALERT ===="
+	echo "==== ALERT ====\n${msg}\n==== END OF ALERT ===="
 }
