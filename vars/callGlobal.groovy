@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 // var/inputStep.groovy
 
-import org.vanroon.Dummy
+import org.vanroon.Nexus
 
 /*
  * usage in Jenkinsfile, add step:  
