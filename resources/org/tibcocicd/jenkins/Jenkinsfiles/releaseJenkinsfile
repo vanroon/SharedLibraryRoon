@@ -1,0 +1,234 @@
+@Library('dwg-jenkins-shared') _
+import org.tibcocicd.GlobalVars
+import org.tibcocicd.Nexus
+import org.tibcocicd.NexusComponent
+import org.tibcocicd.Tibco
+import org.tibcocicd.Gitlab
+
+// Set objects
+def globalVars =        new GlobalVars()
+def nexus =             new Nexus(this, globalVars.nexusUrl, globalVars.adminNexusCID, globalVars.nexusVersion)
+def nexusComponent =    new NexusComponent(this, globalVars.tibcoSnapshotRepo, "@@groupId@@", "@@artifactId@@")
+def nexusComponentRel = new NexusComponent(this, globalVars.tibcoReleaseRepo, nexusComponent.groupId, nexusComponent.artifactId)
+def tibco =             new Tibco(this)
+def gitlab =            new Gitlab(this)
+def versionList =       nexus.getAvailableVersions(nexusComponent)
+
+pipeline {
+    agent any
+    parameters {
+        booleanParam (
+            name: 'dry_run',
+            defaultValue: 'false',
+            description: 'Dry run. Scans for new upstream parameters. Leave unchecked.'
+        )
+        choice (
+            name: 'versionList',
+            choices: versionList,
+            description: 'Snapshot version of artifact in nexus'
+        )
+        choice (
+            name: 'releaseType',
+            choices: globalVars.releaseTypes,
+            description: 'Release type. Affects the auto increment of Bundle-Version.'
+        )
+    }
+    stages{
+        stage ('Clean workspace') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps{
+                deleteDir()
+            }
+        }
+        stage ('Prepare release en set variables') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                script {
+                    // parse GIT URL
+                    var = "${env.GIT_URL}".tokenize('/')
+                    group = var[2]
+                    subgroup = var[3]
+                    repoName = var[4].tokenize('.')[0]
+
+                    // Parse version
+                    def version
+                    switch (params.versionList){
+                        case "Latest":
+                            nexusComponent.setVersion(nexus.getLatestVersion(nexusComponent))
+                            break
+                        default:
+                            nexusComponent.setVersion(params.versionList)
+                            break
+                    }
+                    hash = nexusComponent.version.tokenize('-')[1]
+                    checkout([
+                       $class: 'GitSCM', 
+                       branches: [[name: "${hash}"]], 
+                       doGenerateSubmoduleConfigurations: false, 
+                       extensions: [[
+                           $class: 'LocalBranch', 
+                           localBranch: 'master'
+                       ]], 
+                       submoduleCfg: [], 
+                       userRemoteConfigs: [[
+                           credentialsId: globalVars.rootGitlabCID,
+                            url: "${env.GIT_URL}"
+                       ]]
+                    ])
+                    manFile = sh ([script: """ find . -name MANIFEST.MF | grep "application/" """, returnStdout: true]).trim()
+                    man = readManifest file: manFile
+                    oldRvm = nexusComponentRel.parseBundleVersionToMap(man.main['Bundle-Version'])
+                    oldBv = man.main['Bundle-Version']
+                    newRvm = nexusComponentRel.incrementBundleVersion(oldRvm, releaseType)
+                    newBv = nexusComponentRel.parseMapToBundleVersion(newRvm)
+                    nexusComponentRel.setVersion(newRvm['major']+"."+ newRvm['minor'] +"." + newRvm['patch'])
+                }
+
+            }
+        }
+        stage ('Verify release'){
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                script{
+                    echo "verify release"
+                    withCredentials([string(credentialsId: 'webhook-4-gitlab', variable: 'secretToken')]) {
+                        echo "Checking if version number (${nexusComponentRel.version}) is already tagged in git, or released in Nexus."
+                        id = gitlab.getGitlabProjectId("${env.GIT_URL}", secretToken)
+                        tags = gitlab.getTags("${env.GIT_URL}", secretToken)
+                        versionList = nexus.getAvailableVersions(nexusComponentRel)
+                        if (tags.contains(nexusComponentRel.version)){
+                            errorMsg = "Version is already tagged in Git."
+                            steps.addErrorBadge text: errorMsg
+                            error errorMsg
+                        } else if (versionList.contains(nexusComponentRel.version)){
+                            errorMsg = "Version is already released in Nexus."
+                            steps.addErrorBadge text: errorMsg
+                            error errorMsg
+                        } else {
+                            echo "Version not yet released in git or Nexus. Continuing with release"
+                        }
+
+                    }
+                }
+            }
+        }
+        stage ('Execute release') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            stages {
+                stage ('GIT release') {
+                    steps {
+                        echo "Execute: GIT release"
+                        script {
+                            println "new rel version: ${nexusComponentRel.version}"
+                            println "old SnapshotVersion: ${nexusComponent.version}"
+                            println "old Bundle Version: ${oldBv}"
+                            println "ReleaseType: ${releaseType}"
+                            println "new Bundle Version ${newBv}"
+                            withCredentials([usernamePassword(credentialsId: globalVars.rootGitlabCID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                                withEnv([
+                                    "NEW_BUNDLE_VERSION=${newBv}",
+                                    "OLD_BUNDLE_VERSION=${oldBv}",
+                                    "RELEASE_VERSION=${nexusComponentRel.version}",
+                                    "HASH=${hash}",
+                                    "USER=${USER}",
+                                    "PASS=${PASS}",
+                                    "MANIFEST_FILE=${manFile}",
+                                    "GITLAB_URL=${globalVars.gitlabUrl}",
+                                    "GIT_REPO_URL=${env.GIT_URL}",
+                                    "GROUP=${group}",
+                                    "SUB_GROUP=${subgroup}",
+                                    "REPO_NAME=${repoName}",
+                                    "USER_ID=${nexus.getBuildUser()}"
+                                ]){
+                                    sh '''
+                                        echo "OLD FILE:"
+                                       # find . -name MANIFEST.MF | grep application
+                                       # MANIFEST_FILE=$(find . -name MANIFEST.MF | grep application)
+                                        cat ${MANIFEST_FILE}
+                                        git pull -u "http://${USER}:${PASS}@${GITLAB_URL}/${GROUP}/${SUB_GROUP}/${REPO_NAME}.git" master
+                                        
+                                        #echo ""
+                                        #echo ""
+                                        OLD=$(cat "${MANIFEST_FILE}" | grep "Bundle-Version" | cut -d" " -f 2)
+                                        echo "NEW FILE"
+                                        #sed -i "s|${OLD_BUNDLE_VERSION}|${NEW_BUNDLE_VERSION}|g" "${MANIFEST_FILE}"
+                                        sed -i "s|${OLD}|${NEW_BUNDLE_VERSION}|g" "${MANIFEST_FILE}"
+
+                                        git status
+                                        git status
+                                        git tag -a "${RELEASE_VERSION}" "${HASH}" -m "Released by: ${USER_ID} + timestamp"
+                                        git add "${MANIFEST_FILE}"
+                                        git commit -m 'Increment Manifest BundleVersion from Jenkins'
+                                        git push -u "http://${USER}:${PASS}@${GITLAB_URL}/${GROUP}/${SUB_GROUP}/${REPO_NAME}.git" master
+                                        git push -u "http://${USER}:${PASS}@${GITLAB_URL}/${GROUP}/${SUB_GROUP}/${REPO_NAME}.git" "${RELEASE_VERSION}"
+                                    '''
+                                    
+                                }
+                            }
+                        }
+                    }
+                }
+                stage ('Nexus release') {
+                    steps {
+                        echo "Execute: nexus release"
+                        echo "Downloading artifact from Nexus snapshot"
+                        script{
+                            earFile = nexus.download(nexusComponent)
+                            echo "Downloaded file: " + earFile
+                        }
+                        echo "Updating version in MANIFEST.MF"
+                        unzip zipFile: earFile, dir: "zippy"
+                        dir("zippy"){
+                            withEnv([
+                                "NEW_BUNDLE_VERSION=${nexusComponentRel.version}",
+                                "ORIGINAL_EAR=${earFile}"
+                                //"OLD_BUNDLE_VERSION=${oldBv}"
+                            ]){
+                                script {
+                                    sh '''
+                                        STAMP=$(date +%Y%m%d%H%M%S)
+                                        OLD=$(cat META-INF/MANIFEST.MF | grep "Bundle-Version" | cut -d" " -f 2)
+                                        NEW="${NEW_BUNDLE_VERSION}.${STAMP}"
+                                        sed -i "s|${OLD}|${NEW}|g" "META-INF/MANIFEST.MF"
+                                        rm "${ORIGINAL_EAR}"
+                                    '''
+                                }
+                            }
+                        }
+                        zip zipFile: earFile, dir: "zippy"
+                        echo "Uploading artifact to Nexus release"
+                        script {
+                            nexus.upload(earFile, nexusComponentRel)
+                        }
+                    }
+                }
+            }
+            post {
+                failure {
+                    echo "Post block for execution stage "
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            echo "post block complete pipeline"
+        }
+    }
+}

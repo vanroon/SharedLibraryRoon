@@ -1,5 +1,10 @@
 #!/usr/bin/env groovy
-package org.vanroon
+package org.tibcocicd;
+
+/**
+ * Class NexusComponent represents a Nexus component and acts as a collection for all
+ * information used to identify exactly one component.
+ */
 
 class NexusComponent extends PipelineBuilder {
     def repository
@@ -36,6 +41,17 @@ class NexusComponent extends PipelineBuilder {
         this.version = version
     }
 
+    /**
+     * parseBundleVersionToMap: Takes in a Tibco Bundle-Version string and returns the values
+     *   in a map.
+     * INPUT:
+     *  - String bundleVersion:     E.g.: "1.0.0.qualifier"
+     * OUTPUT:
+     *  - Map releaseVersionMap
+     * NOTE:
+     *  - Takes two ArrayLists. one with keys (versionDescList) and one with 
+     *    values (versionNumList). Returned HashMap is a result of both list combined. 
+     */
     def parseBundleVersionToMap(String bundleVersion){
         def versionDescList = GlobalVars.releaseTypes
         def versionNumList = bundleVersion.tokenize(".")
@@ -45,6 +61,13 @@ class NexusComponent extends PipelineBuilder {
         return releaseVersionMap
     }
 
+    /**
+     * parseMapToBundleVersion: converts a releaseVersionMap to a usable Tibco "Bundle-Version"
+     * INPUT:
+     *  - Map rvm
+     * OUTPUT:
+     *  - String bundleVersion
+     */
     def parseMapToBundleVersion(Map rvm){
         def bv = ""
         def i = 0
@@ -58,6 +81,17 @@ class NexusComponent extends PipelineBuilder {
         return bv + "qualifier"
     }
 
+    /**
+     * incrementBundleVersion: increments the "Bundle-Version" with 1, depending on the 
+     *   type of release ("major", "minor" or "patch").
+     * INPUT:
+     *  - Map rvm
+     *  - String releaseType
+     * OUTPUT:
+     *  - Map rvm
+     * NOTE:
+     *  - releaseTypes are defined in a list in GlobalVars.groovy
+     */
     def incrementBundleVersion(Map rvm, String releaseType){
         rvm[releaseType] = (rvm[releaseType].toInteger() + 1 ).toString()
         return rvm

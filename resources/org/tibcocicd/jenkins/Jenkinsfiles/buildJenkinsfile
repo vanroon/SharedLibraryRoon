@@ -1,0 +1,254 @@
+@Library('jenkins-shared') _
+import org.tibcocicd.GlobalVars
+import org.tibcocicd.Nexus
+import org.tibcocicd.NexusComponent
+import org.tibcocicd.Tibco
+import org.tibcocicd.Gitlab
+
+
+// Set objects
+def globalVars = new org.tibcocicd.GlobalVars()
+def nexus = new Nexus(this, globalVars.nexusUrl, globalVars.adminNexusCID, globalVars.nexusVersion)
+def tibco = new Tibco(this)
+def gitlab = new Gitlab(this, globalVars.gitlabApiToken)
+
+pipeline{
+    agent any
+    parameters {
+        booleanParam (
+            name: 'dry_run',
+            defaultValue: 'false',
+            description: 'Dry run. Scans for new upstream parameters. Leave unchecked.'
+        )
+        string(
+            name: 'EmsServerUrl',
+            defaultValue: globalVars.emsServerUrl,
+            description: ''
+        )
+        string(
+            name: 'SoapUIHome',
+            defaultValue: '',
+            description: 'Location of SoapUIHome. E.g. /opt/SoapUI-5.2.1'
+        )
+        string(
+            name: 'TibEmsAdminFolder',
+            defaultValue: globalVars.tibEmsAdminFolder,
+            description: 'Location of Tibco EMS admin directory. E.g. /opt/tibco/bw6/ems/8.3/bin'
+        )
+        string(
+            name: 'bwAppSpace',
+            defaultValue: '',
+            description: ''
+        )
+        string(
+            name: 'bwBin',
+            defaultValue: globalVars.bwBin,
+            description: 'Location of Tibco bin directory for bwadmin, bwdesign etc.'
+        )
+        string(
+            name: 'bwDomain',
+            defaultValue: '',
+            description: ''
+        )
+        string(
+            name: 'bwAgentUrl',
+            defaultValue: '',
+            description: ''
+        )
+    }
+    stages {
+        stage ('Clean Working directory') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                deleteDir()
+            }
+        }
+        stage ('checkout') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            parallel {
+                stage ('application code checkout' ) {
+                    steps {
+                        // Checkout application source code in dir 'application_source'
+                        dir('application_source'){
+                            checkout scm
+                            script{
+                                commithash = "${env.GIT_COMMIT}".substring(0, 8)
+                                version = "b${env.BUILD_NUMBER}-"+commithash
+                            }
+                        }
+                    }
+                }
+                stage ('Shared modules checkout') {
+                    steps {
+                        dir('shared_modules_source'){
+                            // Checkout Shared modules in dir 'shared_modules_source'
+                            checkout([
+                                $class: 'GitSCM', 
+                                branches: [[name: '*/master']], 
+                                doGenerateSubmoduleConfigurations: false, 
+                                extensions: [], 
+                                submoduleCfg: [], 
+                                userRemoteConfigs: [[
+                                    credentialsId: globalVars.rootGitlabCID,
+                                    url: globalVars.sharedModulesRepository
+                                ]]
+                            ])
+                        }
+                    }
+                }
+            }
+        }
+        stage ('parse manifest') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                script{
+                    manifestFile = sh ([script: """ find . -name MANIFEST.MF | grep "application/" """, returnStdout: true]).trim()
+                    man = readManifest file: manifestFile
+                }
+            }
+        }
+        stage ('create app workspace') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                withEnv([
+                    "bwBin=${bwBin}",
+                    "WORKSPACE=${WORKSPACE}",
+                    "appName=${man.main['Bundle-SymbolicName']}"
+                ]){
+                    script{
+                        tibco.createAppWorkspace()
+                    }
+                }
+            }
+        }
+        stage ('Build app artifacts') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                withEnv([
+                    "appVersion=${version}",
+                    "appName=${man.main['Bundle-SymbolicName']}",
+                    "bwBin=${bwBin}",
+                    "WORKSPACE=${WORKSPACE}"
+                ]){
+                    script {
+                        tibco.buildAppArtifact()
+                    }
+                }
+            }
+        }
+        stage ('Create needed queues') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                withEnv([
+                    "tibEmsAdminFolder=${tibEmsAdminFolder}",
+                    "emsServerUrl=${emsServerUrl}"
+                ]){
+                    withCredentials([usernamePassword(credentialsId: '5004cde6-cd78-4817-883b-16a3edf158c2', passwordVariable: 'emsServerPassword', usernameVariable: 'emsServerUsername')]) {
+                        script {
+                            tibco.createEmsQueues()
+                        }
+                    }
+                }
+            }	
+        }
+        // stage ('RunSoapUI Test Suite') {}
+        // stage ('Parse Test Results') {}
+        stage ('Deploy artifact to Nexus') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+            // Deploy to Nexus
+            // Pass fileName, repository, groupId, artifactId, extension, version and classifier (if not empty)
+                script {
+                    gId = globalVars.tibcoGroupId+"."+gitlab.getsubgroup(env.GIT_URL)
+                    aId = man.main['Bundle-SymbolicName'].toLowerCase() 
+                    nc = new NexusComponent(this, globalVars.tibcoSnapshotRepo, gId, aId)
+                    nc.setVersion(version)
+                    rvm = nc.parseBundleVersionToMap(man.main['Bundle-Version'])
+
+                    fileName = ""
+                    fileName += "${WORKSPACE}/exports/"
+                    fileName += "${man.main['Bundle-SymbolicName']}/"
+                    fileName += "${version}/"
+                    fileName += "${man.main['Bundle-SymbolicName']}_"
+                    fileName += rvm['major']+"."+rvm['minor'] +"." + rvm['patch'] +"."
+                    fileName += globalVars.tibcoArchiveExtension
+                    
+                    nexus.upload(fileName, nc)
+                }
+            }
+        }
+        stage ('Deploy artifact to DEV'){
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            // Trigger downstream Deploy Job
+            steps {
+                build job: '@@deployJob@@',
+                parameters: [
+                    string (
+                        name: 'groupId', 
+                        value: nc.groupId
+                    ),
+                    string (
+                        name: 'artifactId',
+                        value: nc.artifactId
+                    ),
+                    string (
+                        name: 'extension',
+                        value: nc.extension
+                    ),
+                    string (
+                        name: 'version',
+                        value: nc.version
+                    ),
+                    string (
+                        name: 'bwDomain',
+                        value: tibco.getDevDomain(gitlab.getsubgroup("${env.GIT_URL}"))
+                    ),
+                    string (
+                        name: 'bwAppSpace',
+                        value: "${man.main['Bundle-SymbolicName'].tokenize('.')[0]}-AppSpace01"
+                    ),
+                    string (
+                        name: 'PROFILE',
+                        value: 'DEV.substvar'
+                    ),
+                    string (
+                        name: 'bwAgentUrl',
+                        value: globalVars.defaultBwAgent
+                    )
+                ]
+            }
+        }
+    }
+}

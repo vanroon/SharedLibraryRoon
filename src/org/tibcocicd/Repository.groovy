@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-package org.vanroon;
+package org.tibcocicd;
 
 interface Repository {
     def ping()

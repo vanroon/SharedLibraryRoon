@@ -1,0 +1,144 @@
+@Library('dwg-jenkins-shared') _
+import org.tibcocicd.GlobalVars
+import org.tibcocicd.Nexus
+import org.tibcocicd.NexusComponent
+import org.tibcocicd.Tibcodeploy
+import org.tibcocicd.Tibco
+
+// Set objects
+def globalVars =        new org.tibcocicd.GlobalVars()
+def nexus =             new Nexus(this, globalVars.nexusUrl, globalVars.adminNexusCID, globalVars.nexusVersion)
+def nexusComponent =    new NexusComponent(this, "@@nexusRepository@@", "@@groupId@@", "@@artifactId@@")
+def tibcodeploy =       new Tibcodeploy(this, "@@environment@@", "@@appName@@")
+def versionList =       nexus.getAvailableVersions(nexusComponent)
+
+pipeline {
+    agent any
+    parameters {
+        booleanParam (
+            name: 'dry_run',
+            defaultValue: 'false',
+            description: 'Dry run. Scans for new upstream parameters. Leave unchecked.'
+        )
+        string(
+            name: 'groupId',
+            defaultValue: nexusComponent.groupId,
+            description: 'GroupId of artifact in Nexus'
+        )
+        string(
+            name: 'artifactId',
+            defaultValue: nexusComponent.artifactId,
+            description: 'groupname'
+        )
+        string(
+            name: 'extension',
+            defaultValue: "${globalVars.tibcoArchiveExtension}",
+            description: 'Extension of artifact'
+        )
+        choice (
+            name: 'versionList',
+            choices: versionList,
+            description: 'Snapshot version of artifact in nexus'
+        )
+        string(
+            name: 'version',
+            defaultValue: '',
+            description: 'Version of artifact. Overrides version from dropdown menu'
+        )
+        string(
+            name: 'classifier',
+            defaultValue: '',
+            description: 'Classifier of artifact'
+        )
+        string(
+            name: 'oldVersion',
+            defaultValue: '',
+            description: 'Version of app to undeploy'
+        )
+    }
+
+    stages {
+        stage ('Clean Working directory') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                deleteDir()
+            }
+        }
+        stage ('Get approval'){
+            when {
+                allOf {
+                    expression { return !params.dry_run }
+                    expression { tibcodeploy.environment ==~ /(UAT|Prod)/ }
+                }
+            }
+            steps {
+                input message: "Deploy ${tibcodeploy.appName} to ${tibcodeploy.environment}", ok: 'Approve', submitter: "${globalVars.tibcoDeployApprovers}"
+            }
+        }
+        stage ('Nexus - Download artifact') {
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps{
+                script {
+                    // set version
+                    if (params.version){
+                        nexusComponent.setVersion(version)
+                    } else {
+                        switch (params.versionList){
+                            case "Latest":
+                                nexusComponent.setVersion(nexus.getLatestVersion(nexusComponent))
+                                break
+                            default:
+                                nexusComponent.setVersion(params.versionList)
+                                break
+                        }
+                    }
+                    earFile = nexus.download(nexusComponent)
+                }
+            }
+        }
+        stage ('Tibco - Upload app'){
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                echo "Upload Tibco App"
+                withEnv([
+                    "earFile=${earFile}",
+                ]){
+                    script {
+                        tibcodeploy.setVars()
+                        tibcodeploy.echoVars()
+                        tibcodeploy.uploadApp("${earFile}")
+                    }
+                }
+            }
+        }
+        stage ('Tibco - Deploy app'){
+            when {
+                expression {
+                    return !params.dry_run
+                }
+            }
+            steps {
+                echo "Deploy Tibco app"
+                withEnv([
+                "earFile=${earFile}",
+                ]){
+                    script {
+                        tibcodeploy.deployApp(tibcodeploy.basename("${earFile}"))
+                    }
+                }
+            }
+        }
+    }
+}

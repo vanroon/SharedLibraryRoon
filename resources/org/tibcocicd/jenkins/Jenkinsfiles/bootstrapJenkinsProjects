@@ -1,0 +1,296 @@
+@Library('jenkins-shared') _
+import org.tibcocicd.GlobalVars
+import org.tibcocicd.Jenkins
+
+def globalVars = new org.tibcocicd.GlobalVars()
+def jenkins = new org.tibcocicd.Jenkins(this, "http://${globalVars.jenkinsUrl}", globalVars.jenkinsSystemUserCID)
+def gitlab = new org.tibcocicd.Gitlab(this)
+
+pipeline {
+    agent any
+    parameters {
+        string (
+            name: 'repoUrl',
+            defaultValue: '',
+            description: ''
+        )
+        booleanParam(
+            name: 'reloadJenkinsJobs',
+            defaultValue: false,
+            description: 'When checked, existing Jenkins jobs will be removed and recreated.'
+        )
+    }
+    stages{
+        stage ('deleteDir') {
+            steps {
+                deleteDir()
+            }
+        }
+        stage('checkout') {
+            steps {
+                checkout changelog: false, 
+                poll: false, 
+                scm: [
+                    $class: 'GitSCM', 
+                    branches: [[name: '*/master']], 
+                    doGenerateSubmoduleConfigurations: false, 
+                    extensions: [[
+                        $class: 'UserIdentity', 
+                        email: 'jenkins@local.org', 
+                        name: 'jenkins',
+                        $class: 'LocalBranch', 
+                        localBranch: 'master'
+                    ]], 
+                    submoduleCfg: [], 
+                    userRemoteConfigs: [[
+                        credentialsId: globalVars.rootGitlabCID, 
+                        url: repoUrl
+                    ]]
+                ]
+            }
+        }
+        stage('set vars') {
+            steps{
+                script {
+                    var = repoUrl.tokenize('/')
+                    group = var[2]
+                    subgroup = var[3]
+                    repoName = var[4].tokenize('.')[0]
+
+                    jobName = subgroup + "_" + repoName
+                    jobNameDeployDev = "DEV_" + jobName
+                    jobNameDeployTest = "TEST_" + jobName
+                    jobNameDeployUat = "UAT_" + jobName
+                    jobNameDeployProd = "PROD_" + jobName
+                    jobNameRelease = "RELEASE_" + jobName
+                    jobPathDeploy = "/job/deployment_" + subgroup
+                    jobPathRelease ="/job/release_" + subgroup
+
+                    gitlabToken = globalVars.date
+
+                    manFile = sh ([script: """ find . -name MANIFEST.MF | grep "application/" """, returnStdout: true]).trim()
+                    man = readManifest file: manFile
+                    appName = man.main['Bundle-SymbolicName']
+
+
+                }
+            }
+        }
+        stage ('move substsvars') {
+            steps {
+                    script {
+                        println repoName
+                        sh '''
+                            DIR=$(find . -iname '*.application' -type d)
+                            cp -u resources/deploy/envSettings/*.substvar "src/bw/${DIR##*/}/META-INF/." 
+                        '''
+                    }
+            }   
+        }
+        stage ('addJFiles and replace values') {
+            steps {
+                withEnv([
+                    "SUBGROUP=${subgroup}", 
+                    "REPONAME=${repoName}",
+                    "GROUPID=${globalVars.tibcoGroupId}",
+                    "BWAGENTURL=${globalVars.defaultBwAgent}",
+                    "NEXUS_SNAPSHOT_REPO=${globalVars.tibcoSnapshotRepo}",
+                    "NEXUS_RELEASE_REPO=${globalVars.tibcoReleaseRepo}",
+                    "appName=${appName}",
+                    "artifactId=${appName.toLowerCase()}",
+                    "GIT_HOST=${globalVars.rawGitHubHostname}"
+                ]){
+                    script {
+                        sh '''
+                            curl -o Jenkinsfile -L "http://${GIT_HOST}/vanroon/SharedLibraryRoon/master/resources/org/tibcocicd/jenkins/Jenkinsfiles/buildJenkinsfile"
+                            curl -o deployJenkinsfileDEV -L "http://${GIT_HOST}/vanroon/SharedLibraryRoon/master/resources/org/tibcocicd/jenkins/Jenkinsfiles/deployJenkinsfile"
+                            cp deployJenkinsfileDEV deployJenkinsfileTEST
+                            cp deployJenkinsfileDEV deployJenkinsfileUAT
+                            cp deployJenkinsfileDEV deployJenkinsfilePROD
+                            curl -o releaseJenkinsfile -L "http://${GIT_HOST}/vanroon/SharedLibraryRoon/master/resources/org/tibcocicd/jenkins/Jenkinsfiles/releaseJenkinsfile"
+
+                            # Set variables
+                            deployJob="deployment_${SUBGROUP}/DEV_${SUBGROUP}_${REPONAME}"
+                            groupId="${GROUPID}.${SUBGROUP}"
+                            artifactId="${artifactId}"
+                            #nexusSnapshotRepository="${NEXUS_SNAPSHOT_REPO}"
+                            
+                            echo "Replacing values for Jenkinsfile"
+                            sed -i "s|@@deployJob@@|${deployJob}|g" Jenkinsfile
+
+
+                            echo "Replacing values for deployJenkinsfileDEV"
+                            sed -i "s|@@nexusRepository@@|${NEXUS_SNAPSHOT_REPO}|g" deployJenkinsfileDEV
+                            sed -i "s|@@groupId@@|${groupId}|g" deployJenkinsfileDEV
+                            sed -i "s|@@artifactId@@|${artifactId}|g" deployJenkinsfileDEV
+                            sed -i "s|@@appName@@|${appName}|g" deployJenkinsfileDEV
+                            sed -i "s|@@environment@@|DEV|g" deployJenkinsfileDEV
+
+                            echo "Replacing values for deployJenkinsfileTEST"
+                            sed -i "s|@@nexusRepository@@|${NEXUS_SNAPSHOT_REPO}|g" deployJenkinsfileTEST
+                            sed -i "s|@@groupId@@|${groupId}|g" deployJenkinsfileTEST
+                            sed -i "s|@@artifactId@@|${artifactId}|g" deployJenkinsfileTEST
+                            sed -i "s|@@appName@@|${appName}|g" deployJenkinsfileTEST
+                            sed -i "s|@@environment@@|TEST|g" deployJenkinsfileTEST
+
+                            echo "Replacing values for releaseJenkinsfile"
+                            sed -i "s|@@groupId@@|${groupId}|g" releaseJenkinsfile
+                            sed -i "s|@@artifactId@@|${artifactId}|g" releaseJenkinsfile
+
+                            echo "Replacing values for deployJenkinsfileUAT"
+                            sed -i "s|@@nexusRepository@@|${NEXUS_RELEASE_REPO}|g" deployJenkinsfileUAT
+                            sed -i "s|@@groupId@@|${groupId}|g" deployJenkinsfileUAT
+                            sed -i "s|@@artifactId@@|${artifactId}|g" deployJenkinsfileUAT
+                            sed -i "s|@@appName@@|${appName}|g" deployJenkinsfileUAT
+                            sed -i "s|@@environment@@|UAT|g" deployJenkinsfileUAT
+
+                            echo "Replacing values for deployJenkinsfilePROD"
+                            sed -i "s|@@nexusRepository@@|${NEXUS_RELEASE_REPO}|g" deployJenkinsfilePROD
+                            sed -i "s|@@groupId@@|${groupId}|g" deployJenkinsfilePROD
+                            sed -i "s|@@artifactId@@|${artifactId}|g" deployJenkinsfilePROD
+                            sed -i "s|@@appName@@|${appName}|g" deployJenkinsfilePROD
+                            sed -i "s|@@environment@@|Prod|g" deployJenkinsfilePROD
+                        '''
+                    }
+                }
+            }
+        }
+        stage ('commit back to GIT'){
+            steps{
+                withCredentials([usernamePassword(credentialsId: globalVars.rootGitlabCID, passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    withEnv([
+                        "USER=${USER}",
+                        "PASS=${PASS}",
+                        "gitlabUrl=${globalVars.gitlabUrl}",
+                        "group=${group}",
+                        "subgroup=${subgroup}",
+                        "repoName=${repoName}"
+                    ]){
+                        script {
+                            sh '''
+                                ls -alhs
+                                git status
+                                git config --global user.email "jenkins@local.org"
+                                git config --global user.name "Jenkins"
+                                git config --global push.default simple
+                                git status
+                                if [ $(git status | grep -e "^nothing to commit" | wc -l) -gt 0 ]
+                                then
+                                    echo "Skipping commit and push"
+                                else
+                                    git add --all
+                                    git commit -m 'Change from Jenkins'
+                                    git push -u "http://${USER}:${PASS}@${gitlabUrl}/${group}/${subgroup}/${repoName}.git" master
+                                fi
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+        stage('set hook') {
+            when {
+                expression {
+                    return params.reloadJenkinsJobs
+                }
+            }
+            steps {
+                withCredentials([string(credentialsId: 'webhook-4-gitlab', variable: 'PRIVATE_TOKEN')]) {
+                    script{
+                        repoId = gitlab.getGitlabProjectId(repoUrl, PRIVATE_TOKEN)
+                        hookUrl = "http://${globalVars.jenkinsUrl}/project/${subgroup}_${repoName}"
+                        rc = gitlab.addHookToRepo(repoId, hookUrl, gitlabToken, PRIVATE_TOKEN)
+
+                        echo "setting the URL with use of gitlab class method."
+                        echo "hookUrl: ${hookUrl}"
+                        echo "hookToken: ${gitlabToken}"
+                        echo "HTTP responseCode = ${rc}"
+                    }
+                }
+            }
+        }
+        stage('Reload Jenkins jobs') {
+            when {
+                expression {
+                    return params.reloadJenkinsJobs
+                }
+            }
+            steps{
+                withCredentials ([
+                    usernameColonPassword(credentialsId: jenkins.credentials, variable: 'JENKINS_USERPASS')
+                ]) {
+                    script {
+                        // Delete build and deploy jobs
+                        jenkins.deleteJob(JENKINS_USERPASS, "", jobName)
+                        jenkins.deleteJob(JENKINS_USERPASS, jobPathDeploy, jobNameDeployDev)
+                        jenkins.deleteJob(JENKINS_USERPASS, jobPathDeploy, jobNameDeployTest)
+                        jenkins.deleteJob(JENKINS_USERPASS, jobPathRelease, jobNameRelease)
+
+                        // Create build job
+                        configXml = jenkins.createPipelineConfigXml(globalVars.gitlabConnectionName, repoUrl, globalVars.rootGitlabCID, gitlabToken)
+                        jenkins.createJob(JENKINS_USERPASS, "", jobName, configXml)
+                        // Create deploy job DEV TEST
+                        configXmlDev = jenkins.createPipelineConfigXml(globalVars.gitlabConnectionName, repoUrl, globalVars.rootGitlabCID, gitlabToken, "deployJenkinsfileDEV")
+                        configXmlTest = jenkins.createPipelineConfigXml(globalVars.gitlabConnectionName, repoUrl, globalVars.rootGitlabCID, gitlabToken, "deployJenkinsfileTEST")
+                        jenkins.createJob(JENKINS_USERPASS, jobPathDeploy, jobNameDeployDev, configXmlDev)
+                        jenkins.createJob(JENKINS_USERPASS, jobPathDeploy, jobNameDeployTest, configXmlTest)
+                        // Create release job
+                        configXml = jenkins.createPipelineConfigXml(globalVars.gitlabConnectionName, repoUrl, globalVars.rootGitlabCID, gitlabToken, "releaseJenkinsfile")
+                        jenkins.createJob(JENKINS_USERPASS, jobPathRelease, jobNameRelease, configXml)
+                        // Create deploy job UAT PROD
+                        configXmlUat = jenkins.createPipelineConfigXml(globalVars.gitlabConnectionName, repoUrl, globalVars.rootGitlabCID, gitlabToken, "deployJenkinsfileUAT")
+                        configXmlProd = jenkins.createPipelineConfigXml(globalVars.gitlabConnectionName, repoUrl, globalVars.rootGitlabCID, gitlabToken, "deployJenkinsfilePROD")
+                        jenkins.createJob(JENKINS_USERPASS, jobPathDeploy, jobNameDeployUat, configXmlUat)
+                        jenkins.createJob(JENKINS_USERPASS, jobPathDeploy, jobNameDeployProd, configXmlProd)
+                    }
+                }
+            }
+        }
+        stage('Trigger dry runs'){
+            steps{
+                build job: "${subgroup}_${repoName}",
+                parameters: [
+                    string (
+                        name: 'dry_run', 
+                        value: 'true'
+                    )
+                ]
+                build job: "deployment_${subgroup}/DEV_${subgroup}_${repoName}",
+                parameters: [
+                    string (
+                        name: 'dry_run', 
+                        value: 'true'
+                    )
+                ]
+                build job: "deployment_${subgroup}/TEST_${subgroup}_${repoName}",
+                parameters: [
+                    string (
+                        name: 'dry_run', 
+                        value: 'true'
+                    )
+                ]
+                build job: "release_${subgroup}/RELEASE_${subgroup}_${repoName}",
+                parameters: [
+                    string (
+                        name: 'dry_run', 
+                        value: 'true'
+                    )
+                ]
+                build job: "deployment_${subgroup}/UAT_${subgroup}_${repoName}",
+                parameters: [
+                    string (
+                        name: 'dry_run', 
+                        value: 'true'
+                    )
+                ]
+                build job: "deployment_${subgroup}/PROD_${subgroup}_${repoName}",
+                parameters: [
+                    string (
+                        name: 'dry_run', 
+                        value: 'true'
+                    )
+                ]
+            }
+        }
+    }
+}

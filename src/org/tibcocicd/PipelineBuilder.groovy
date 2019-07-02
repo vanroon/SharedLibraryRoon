@@ -1,6 +1,11 @@
-package org.vanroon;
+package org.tibcocicd;
 
-import groovy.json.JsonSlurper
+/**
+ * PipelineBuilder is a class that defines basic pipeline operations as 
+ * groovy methods, so they can easily be used inside classes that implement this 
+ * class as a parent. It has to implement 'Serializable' in order to make use of
+ * Jenkins' pipeline functions, steps and variables.
+ */
 
 class PipelineBuilder implements Serializable {
     protected def steps
@@ -10,44 +15,35 @@ class PipelineBuilder implements Serializable {
         this.steps = steps
     }
 
-    /**
-     * jEcho - added 'j' to show difference between this cmd (echo to jenkins console output)
-     * and 'Groovy' echo (that output won't show up in Jenkins console output)
-     * @param string
-     * @return
-     */
-    def jEcho(string) {
-        steps.echo string
+    def basename(filename){
+        filename.split("/")[-1]
     }
 
-    def findUser(){
-        return steps.env.BUILD_USER_ID
-    }
-
-    def getCurrentBuild() {
-
-    }
-
-    def sh(command){
+    def sh(command) {
         steps.sh command
     }
 
+    def echo(string){
+        steps.echo string
+    }
 
-    /**
-     * Return userId of user who started the buid in Jenkins
-     * @return
-     */
-    //@NonCPS
-    def getBuildUser() {
+    def error(msg){
+        steps.error msg
+    }
+
+     def getBuildUser() {
         return steps.currentBuild.rawBuild.getCause(Cause.UserIdCause).getUserId()
     }
 
+    /**
+     * returns a encoded base64 string, based on input string
+     */
     def encodeBase64(String string){
         return string.bytes.encodeBase64().toString()
     }
 
     def getHttpRequestJson(String url, String credentials="") {
-        jEcho "URL = ${url}"
+        echo "URL = ${url}"
         def conn = new URL(url).openConnection() as HttpURLConnection
         conn.setRequestMethod("GET")
         if (credentials.length() > 0){
@@ -61,24 +57,36 @@ class PipelineBuilder implements Serializable {
     }
 
     def postHttpRequestWithXMLBody(String url, String jenkinsCrumb="", String auth="", String body="") {
-        jEcho "URL = ${url}"
+        echo "URL = ${url}"
         def conn = new URL(url).openConnection() as HttpURLConnection
         conn.setRequestMethod("POST")   
         if (jenkinsCrumb.length() > 0){
-            jEcho "Parsing crumb: ${jenkinsCrumb}"
+            echo "Parsing crumb: ${jenkinsCrumb}"
             conn.setRequestProperty("Jenkins-Crumb", jenkinsCrumb)
         }
         if (auth.length() > 0){
-            jEcho "parsing auth: ${auth}"
+            echo "parsing auth: ${auth}"
             conn.setRequestProperty("Authorization", "Basic ${auth}")
         }
         if (body.length() > 0){
             conn.setRequestProperty("Content-Type", "text/xml")
-            jEcho "parsing body: ${body}"
+            echo "parsing body: ${body}"
             conn.setDoOutput(true)
             def OutputStream output = conn.getOutputStream()
             byte[] input = body.getBytes('utf-8')
             output.write(input, 0, input.length)
+        }
+        return conn.responseCode
+    }
+
+    def postHttpRequestNoBody(String url, Map headers){
+        echo "URL = ${url}"
+        def conn = new URL(url).openConnection() as HttpURLConnection
+        conn.setRequestMethod("POST")
+        if (headers.size() > 0) {
+            headers.each { k, v ->
+                conn.setRequestProperty(k, v)
+            }
         }
         return conn.responseCode
     }
