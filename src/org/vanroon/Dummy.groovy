@@ -16,6 +16,9 @@ class Dummy extends PipelineBuilder {
         super(steps)
         this.name = name
     }
+    def printVars(){
+        jEcho steps.BUILD_NUMBER
+    }
 
     def addPersonInfos(String text){
         def yaml = steps.readYaml(text: text)

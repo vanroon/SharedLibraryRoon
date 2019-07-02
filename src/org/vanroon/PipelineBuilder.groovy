@@ -32,6 +32,7 @@ class PipelineBuilder implements Serializable {
         steps.sh command
     }
 
+
     /**
      * Return userId of user who started the buid in Jenkins
      * @return
