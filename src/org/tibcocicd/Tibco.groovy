@@ -48,7 +48,7 @@ class Tibco extends PipelineBuilder {
             bwDesignExecutable=${bwBin}/bwdesign
 #           import tibco projects from application source folder into workspace folder in jenkin's home directory
             bwDesignCommand="${bwDesignExecutable} --propFile ${bwBin}/bwdesign.tra -data ${WORKSPACE}/workspace system:import -f $appSourceDir"
-            xvfb-run ${bwDesignCommand}
+            xvfb-run -a ${bwDesignCommand}
         '''
     }
 
