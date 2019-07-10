@@ -18,7 +18,7 @@ class Dummy extends PipelineBuilder {
         this.name = name
     }
     def printVars(){
-        jEcho steps.BUILD_NUMBER
+        echo steps.BUILD_NUMBER
     }
 
     def addPersonInfos(String text){
