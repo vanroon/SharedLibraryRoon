@@ -1,6 +1,7 @@
 package org.vanroon;
 
 import groovy.transform.InheritConstructors
+import org.tibcocicd.PipelineBuilder
 
 @InheritConstructors
 class Dummy extends PipelineBuilder {
