@@ -9,11 +9,12 @@ import groovy.transform.InheritConstructors
  */
 
 @InheritConstructors
-class Nexus extends PipelineBuilder implements Repository {
-
+class Nexus extends PipelineBuilder {
+// class Nexus extends PipelineBuilder implements Repository {
     def url
     def credentials
     def nexusVersion
+    def userColonPassword
 
     Nexus(steps, url, credentials, nexusVersion) {
         super(steps)
@@ -22,13 +23,24 @@ class Nexus extends PipelineBuilder implements Repository {
         this.nexusVersion = nexusVersion
     }
 
+    def setUserColonPassword(userColonPassword){
+        this.userColonPassword = userColonPassword
+    }
+
     /**
     *   Pings Nexus. Should return 'pong'
+    *   INPUT:
+    *    - String usernameColonPassword:    The usernameColonPassword variable assign in a withCredentials block
     **/
-    def ping(){
-        steps.withCredentials([steps.usernameColonPassword(credentialsId: credentials, variable: 'USERPASS')]){
-            echo "...Pinging Nexus..."
-            sh """curl -u\$USERPASS ${url}service/metrics/ping"""
+    def ping(String usernameColonPassword){
+        echo "...Pinging Nexus..."
+        echo "http://${url}/service/metrics/ping"
+        if (steps.NODE_NAME == "master") {
+            echo "I am on master"
+            def res = getHttpRequestJson("http://${url}/service/metrics/ping", usernameColonPassword)
+            echo res
+        } else {
+            echo "I am not on master"
         }
     }
 
@@ -147,6 +159,57 @@ class Nexus extends PipelineBuilder implements Repository {
             }
             // outPath = result
         }
+        return outPath
+    }
+
+    def downloadGroovy(NexusComponent nc, String usernameColonPassword){
+        def file = downloadGroovy(nc.repository, nc.groupId, nc.artifactId, nc.extension, nc.version, usernameColonPassword)
+        return file
+    }
+
+    def downloadGroovy(String repository, String groupId, String artifactId, String extension, String version, String classifier="", usernameColonPassword) {
+        String outPath = ""
+        def errorMsg
+        def result
+        def artifact
+        def downloadUrl
+
+      //  steps.withCredentials (
+       //     [steps.usernameColonPassword(credentialsId: credentials, variable: 'USERPASS')]
+       // ){
+            try {
+                def searchUrl = "http://${url}/service/rest/v1/search/assets/?repository=${repository}&group=${groupId}&maven.artifactId=${artifactId}&version=${version}&maven.extension=${extension}"
+                //def resultText = sh ([script: """curl -s -v -u\${USERPASS} -X GET --header 'Accept: application/json' '${searchUrl}'""", returnStdout: true]).trim()
+                def resultText = getHttpRequestJson(searchUrl, usernameColonPassword)
+
+                result = steps.readJSON text: resultText
+                artifact = result['items'][0]
+                downloadUrl = artifact['downloadUrl']
+            } catch (NullPointerException npe) {
+                errorMsg = "Failed to download artifact. Artifact not found in Nexus"
+                steps.addErrorBadge text: errorMsg
+                error errorMsg
+            }
+            def remoteSha = result['items']['checksum']['sha1'][0]
+            outPath = "${steps.WORKSPACE}\\${basename(artifact['path'])}"
+
+            echo "downloading ${downloadUrl} to ${outPath}"
+            echo "${steps.NODE_NAME}"
+            //getHttpRequestJson(downloadUrl)
+            powershell ([script: """ Invoke-WebRequest -Uri ${downloadUrl} -OutFile  "${outPath}" """ ])
+            //sh """ curl -s -X GET -u\$USERPASS "${downloadUrl}" -o ${outPath}"""
+
+            def localSha = steps.sha1 "${outPath}"
+            try {
+                assert remoteSha == localSha : errorMsg
+                echo "Checksum match"
+            } catch (AssertionError e) {
+                errorMsg = "SHA1 checksum of downloaded is not matching"
+                echo "ERROR: " + e.getMessage()
+                steps.addErrorBadge text: errorMsg
+                error errorMsg
+            }
+       // }
         return outPath
     }
 

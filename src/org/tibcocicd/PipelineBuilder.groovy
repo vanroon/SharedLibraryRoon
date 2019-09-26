@@ -23,6 +23,10 @@ class PipelineBuilder implements Serializable {
         steps.sh command
     }
 
+    def powershell(command) {
+        steps.powershell command
+    }
+
     def echo(string){
         steps.echo string
     }
@@ -50,10 +54,10 @@ class PipelineBuilder implements Serializable {
             def auth = encodeBase64(credentials)
             conn.setRequestProperty("Authorization", "Basic ${auth}")
         }
-        if (conn.responseCode == 200){
+       // if (conn.responseCode == 200){
            def resultText = conn.getInputStream().getText()
            return resultText
-        }
+     //   }
     }
 
     def postHttpRequestWithXMLBody(String url, String jenkinsCrumb="", String auth="", String body="") {
