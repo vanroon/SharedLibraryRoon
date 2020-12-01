@@ -1,5 +1,6 @@
 #!/usr/bin/env groovy
 // vars/buildImage.groovy
+import com.company.GlobalVars
 
 /**
  * buildImage: builds image
@@ -8,8 +9,14 @@
  * OUTPUT:
  *  - 
  */
-def call(String imageTag) {
-    //def imageHash = steps.sh ([script: """docker build -t ${imageTag}""", returnStdout: true]).trim()
-	println "Tag: ${imageTag}"
 
+
+def call(String imageTag) {
+    timestamps {
+        script {
+          sh '''
+            echo oiIamAStepBuildingIMAGE
+          '''
+        }
+    }
 }
