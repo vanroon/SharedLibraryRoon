@@ -42,6 +42,18 @@ class PipelineBuilder implements Serializable {
         return string.bytes.encodeBase64().toString()
     }
 
+    def banner(string, sign, indent) {
+        def banner = sign.multiply( string.length() + 2 * ( indent + 1 )) + "\n" +
+                     sign.multiply( indent ) + " " + string + " " + sign.multiply( indent ) + "\n" +
+                     sign.multiply( string.length() + 2 * ( indent + 1 ))
+        echo banner
+    }
+
+	def getGitBranch(branch) {
+		def gitBranch = branch.split("/",2)[-1]	
+		return gitBranch
+	}
+
     def getHttpRequestJson(String url, String credentials="") {
         echo "URL = ${url}"
         def conn = new URL(url).openConnection() as HttpURLConnection
